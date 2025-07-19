@@ -1,4 +1,9 @@
 return {
+    -- takes the full path to the submodule, returns true if to display it
+    submodule_filter = nil,
+    -- submodule_filter = function(path)
+    --     return vim.fs.basename(path) ~= "ignored_module"
+    -- end,
     window = {
         mappings = {
             -- copied from the standard git status

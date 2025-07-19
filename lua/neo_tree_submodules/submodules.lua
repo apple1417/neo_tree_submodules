@@ -5,10 +5,14 @@ local git_utils = require("neo-tree.git.utils")
 
 local M = {}
 
+---@class SubModuleStatus
+---@field status " "|"-"|"+"|"U"|string The submodule's status
+---@field path string The submodule's path
+
 ---Recursively gets all submodules under the given git root
 ---@param git_root string? The root git directory to search under
----@return string[] # Paths to each submodule's root
-local function list_submodules(git_root)
+---@return Iter<SubModuleStatus> # Each detected submodule
+M.list_submodules = function(git_root)
     git_root = git_root or "."
 
     local ret = vim.system(
@@ -25,21 +29,23 @@ local function list_submodules(git_root)
         return {}
     end
 
-    local submodules_paths = {}
-    for _, line in pairs(vim.split(ret.stdout, "\n")) do
-        local match = line:match("^.[0-9a-fA-F]+ (.+) %(..-%)$")
-        if match ~= nil then
-            local path = vim.fs.abspath(vim.fs.joinpath(git_root, git_utils.octal_to_utf8(match)))
-            table.insert(submodules_paths, path)
+    return vim.iter(vim.split(ret.stdout, "\n")):map(function(line)
+        local status, rel_path = line:match("^(.)[0-9a-fA-F]+ (.+) %(..-%)$")
+        if status == nil or rel_path == nil then
+            return nil
         end
-    end
-    return submodules_paths
+
+        local full_path = vim.fs.abspath(
+            vim.fs.joinpath(git_root, git_utils.octal_to_utf8(rel_path))
+        )
+        return { status=status, path=full_path }
+    end)
 end
 
 ---Convert a list of paths to unique basenames/basename-folder suffixes
 ---@param paths string[] The list of paths to get unique names for
 ---@return string[] # A list of unique names, in the same order as the input list
-local function get_unique_path_names(paths)
+M.get_unique_path_names = function(paths)
     local is_windows = vim.fn.has("win32")
     local path_separator = is_windows and "\\" or "/"
 
@@ -86,21 +92,41 @@ M.draw = function(state)
     state.default_expanded_nodes = {}
 
     local git_root = git.get_repository_root()
-    local repos = list_submodules(git_root)
-    table.insert(repos, 1, git_root)
 
-    local unique_repo_names = get_unique_path_names(repos)
+    local repos = M.list_submodules(git_root):filter(
+        function(repo)
+            -- Ignore any uninitalized submodules
+            if repo.status == "-" then
+                return false
+            end
+            -- Run the user filter
+            if type(state.submodule_filter) == "function" then
+                if not state.submodule_filter(repo.path) then
+                    return false
+                end
+            end
+            return true
+        end
+    ):totable()
 
-    local repo_data = vim.iter(repos):enumerate():map(function(i, path)
+    -- Add the root to the list, treat as always modified
+    table.insert(repos, 1, { status = "+", path=git_root })
+
+    local unique_repo_names = M.get_unique_path_names(
+        vim.iter(repos):map(function(f) return f.path end):totable()
+    )
+
+    local repo_data = vim.iter(repos):enumerate():map(function(i, data)
         local context = file_items.create_context()
         context.state = state
 
         return {
-            path = path,
+            path = data.path,
+            submodule_status = data.status,
             name = unique_repo_names[i],
             context = context,
             root = nil,
-            status = {},
+            status_lookup = {},
         }
     end):totable()
 
@@ -114,31 +140,33 @@ M.draw = function(state)
 
         data.context.folders[data.root.id] = data.root
 
-        local status_lookup, _ = git.status(state.git_base, true, data.path)
+        -- If the submodule is clean already, no need to do a status on it
+        if data.submodule_status ~= " " then
+            local status_lookup, _ = git.status(state.git_base, true, data.path)
 
-        for path, status in pairs(status_lookup) do
-            local success, item = pcall(file_items.create_item, data.context, path, "file")
-            item.status = status
-            if success then
-                item.extra = {
-                    git_status = status,
-                    submodule = data.path,
-                }
+            for path, status in pairs(status_lookup) do
+                local success, item = pcall(file_items.create_item, data.context, path, "file")
+                item.status = status
+                if success then
+                    item.extra = {
+                        git_status = status,
+                        submodule = data.path,
+                    }
+                end
             end
+            data.status_lookup = status_lookup
         end
 
         for id, _ in pairs(data.context.folders) do
             table.insert(state.default_expanded_nodes, id)
         end
-
-        data.status = status_lookup
         file_items.advanced_sort(data.root.children, state)
     end
 
     state.path = git_root or state.path or vim.fn.getcwd()
     state.git_status_lookup = vim.iter(repo_data):map(
         function(data)
-            return data.status
+            return data.status_lookup
         end):fold({}, function(acc, v)
             return vim.tbl_extend("keep", acc, v)
         end)
