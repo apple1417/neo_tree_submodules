@@ -12,8 +12,8 @@ local function list_submodules(git_root)
     git_root = git_root or "."
 
     local ret = vim.system(
-        { "git", "submodule", "status", "--recursive" },
-        { cwd=git_root, text=true }
+        { "git", "-C", git_root, "submodule", "status", "--recursive" },
+        { text=true }
     ):wait()
 
     if ret.code ~= 0 then
@@ -110,6 +110,8 @@ M.draw = function(state)
         data.root.name = data.name
         data.root.loaded = true
         data.root.search_pattern = state.search_pattern
+        data.root.extra = { submodule = data.path }
+
         data.context.folders[data.root.id] = data.root
 
         local status_lookup, _ = git.status(state.git_base, true, data.path)
@@ -134,7 +136,12 @@ M.draw = function(state)
     end
 
     state.path = git_root or state.path or vim.fn.getcwd()
-    -- state.repo_data = repo_data
+    state.git_status_lookup = vim.iter(repo_data):map(
+        function(data)
+            return data.status
+        end):fold({}, function(acc, v)
+            return vim.tbl_extend("keep", acc, v)
+        end)
 
     renderer.show_nodes(
         vim.iter(repo_data):map(function(data)
