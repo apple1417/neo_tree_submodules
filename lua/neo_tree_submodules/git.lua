@@ -1,5 +1,19 @@
 local M = {}
 
+---Converts a possibly octal encoded file path to utf8
+---@param text string
+---@return string
+local function octal_to_utf8(text)
+    local success, converted = pcall(string.gsub, text, "\\([0-7][0-7][0-7])", function(octal)
+        return string.char(tonumber(octal, 8))
+    end)
+    if success then
+        return converted
+    else
+        return text
+    end
+end
+
 ---Finds the root dir of the git repo the cwd is under
 ---@return string? # The root dir, or nil if not found
 M.find_git_root = function()
@@ -11,7 +25,7 @@ M.find_git_root = function()
         -- error
         return nil
     end
-    return vim.fs.abspath(vim.trim(ret.stdout))
+    return vim.fs.abspath(octal_to_utf8(vim.trim(ret.stdout)))
 end
 
 ---Recursively gets all submodules under the given git root
@@ -38,7 +52,7 @@ M.list_submodules = function(git_root)
     for _, line in pairs(vim.split(ret.stdout, "\n")) do
         local match = line:match("^.[0-9a-fA-F]+ (.+) %(..-%)$")
         if match ~= nil then
-            local path = vim.fs.abspath(vim.fs.joinpath(git_root, match))
+            local path = vim.fs.abspath(vim.fs.joinpath(git_root, octal_to_utf8(match)))
             table.insert(submodules_paths, path)
         end
     end

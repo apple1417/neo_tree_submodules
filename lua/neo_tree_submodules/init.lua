@@ -3,7 +3,8 @@ local events = require("neo-tree.events")
 local manager = require("neo-tree.sources.manager")
 local file_items = require("neo-tree.sources.common.file-items")
 
-local git = require("neo_tree_submodules.git")
+local my_git = require("neo_tree_submodules.git")
+local git = require("neo-tree.git")
 
 ---Convert a list of paths to unique basenames/basename-folder suffixes
 ---@param paths string[] The list of paths to get unique names for
@@ -51,9 +52,9 @@ local function draw(state)
     state.loading = true
     state.default_expanded_nodes = {}
 
-    local git_root = git.find_git_root()
+    local git_root = my_git.find_git_root()
 
-    local repos = git.list_submodules(git_root)
+    local repos = my_git.list_submodules(git_root)
     table.insert(repos, 1, git_root)
 
     local unique_repo_names = get_unique_path_names(repos)
@@ -71,49 +72,33 @@ local function draw(state)
         }
     end):totable()
 
-    for i, data in pairs(repo_data) do
+    for _, data in pairs(repo_data) do
         data.root = file_items.create_item(data.context, data.path, "directory")
+        data.root.id = "neo_tree_submodules:root:" .. data.root.id
         data.root.name = data.name
         data.root.loaded = true
         data.root.search_pattern = state.search_pattern
-        data.context.folders[data.root.path] = data.root
+        data.context.folders[data.root.id] = data.root
 
+        local status_lookup, _ = git.status(state.git_base, true, data.path)
 
-        -- get status
-
-        if #data.status == 0 then
-            table.insert(data.root.children, {
-                id = "neo_tree_submodules:clean:" .. i,
-                name = "clean",
-                type = "directory",
-                children = {},
-            })
-        else
-            -- not clean so auto expand
-            table.insert(state.default_expanded_nodes, data.root.id)
+        for path, status in pairs(status_lookup) do
+            local success, item = pcall(file_items.create_item, data.context, path, "file")
+            item.status = status
+            if success then
+                item.extra = {
+                    git_status = status,
+                }
+            end
         end
 
+        for id, _ in pairs(data.context.folders) do
+            table.insert(state.default_expanded_nodes, id)
+        end
+
+        data.status = status_lookup
         file_items.advanced_sort(data.root.children, state)
     end
-
-    --[[for path, status in pairs(status_lookup) do
-        local success, item = pcall(file_items.create_item, context, path, "file")
-        item.status = status
-        if success then
-            item.extra = {
-                git_status = status,
-            }
-        else
-            log.error("Error creating item for " .. path .. ": " .. item)
-        end
-    end
-
-    for _, path in pairs(submodules) do
-        local success, item = pcall(file_items.create_item, context, path, "directory")
-        if not success then
-            log.error("Error creating item for " .. path .. ": " .. item)
-        end
-    end]]
 
     state.path = git_root or state.path or vim.fn.getcwd()
     state.repo_data = repo_data
