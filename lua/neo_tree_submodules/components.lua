@@ -1,35 +1,25 @@
-local highlights = require("neo-tree.ui.highlights")
-local common = require("neo-tree.sources.common.components")
+local git_status = require("neo-tree.sources.git_status.components")
+local hl = require("neo-tree.ui.highlights")
 
 local M = {}
 
+-- we can mostly use the standard git status's components, just need to overwrite the root nodes
 M.name = function(config, node, state)
-    local highlight = config.highlight or highlights.FILE_NAME_OPENED
-    local name = node.name
-
-    if node.type == "directory" then
-        if node:get_depth() == 1 then
-            if not node:has_children() then
-                highlight = highlights.GIT_IGNORED
-                name = name .. " (clean)"
-            else
-                highlight = highlights.ROOT_NAME
-            end
+    if node.type == "directory" and node:get_depth() == 1 then
+        if node:has_children() then
+            return {
+                text = node.name,
+                highlight = hl.ROOT_NAME,
+            }
         else
-            highlight = highlights.DIRECTORY_NAME
-        end
-    elseif config.use_git_status_colors then
-        -- todo
-        local git_status = state.components.git_status({}, node, state)
-        if git_status and git_status.highlight then
-            highlight = git_status.highlight
+            return {
+                text = node.name .. " (clean)",
+                highlight = hl.GIT_IGNORED,
+            }
         end
     end
 
-    return {
-        text = name,
-        highlight = highlight,
-    }
+    return git_status.name(config, node, state)
 end
 
-return vim.tbl_deep_extend("force", common, M)
+return vim.tbl_deep_extend("force", git_status, M)
