@@ -45,12 +45,11 @@ M.get_repository_root = function(callback)
 
             if code == 0 then
                 git_root = self:result()[1]
+                git_root = vim.fs.abspath(git_root)
 
                 if utils.is_windows then
                     git_root = utils.windowize_path(git_root)
                 end
-
-                git_root = vim.fs.abspath(git_root)
             end
 
             vim.schedule(function()
@@ -89,6 +88,10 @@ M.parse_git_status_line = function(line, git_root)
     local full_path = vim.fs.abspath(
         vim.fs.joinpath(git_root, relative_path)
     )
+
+    if utils.is_windows then
+        full_path = utils.windowize_path(full_path)
+    end
 
     return { path=full_path, status=status }
 end
@@ -192,6 +195,11 @@ M.submodule_status = function(git_root, callback)
                 local new_submodule_rel_path = line:match("^Entering '(.+)'$")
                 if new_submodule_rel_path ~= nil then
                     current_submodule = vim.fs.joinpath(git_root, new_submodule_rel_path)
+ 
+                    if utils.is_windows then
+                        current_submodule = utils.windowize_path(current_submodule)
+                    end
+
                     self.statuses[current_submodule] = {}
                     return
                 end
@@ -276,12 +284,14 @@ end
 ---@return table<string, string> unique_names A map of the original path to the unique name
 M.get_unique_path_names = function(paths)
     local path_data = vim.iter(paths):map(function(path)
+        local working_path = path
+
         -- on windows do both path seperators
         if utils.is_windows then
-            path = path:gsub("/", "\\")
+            working_path = working_path:gsub("/", "\\")
         end
 
-        local parts = vim.iter(vim.split(path, utils.path_separator)):rev():totable()
+        local parts = vim.iter(vim.split(working_path, utils.path_separator)):rev():totable()
         return { original=path, n = 1, parts=parts }
     end):totable()
 
@@ -323,7 +333,7 @@ M.draw = function(state)
     state.default_expanded_nodes = state.default_expanded_nodes or {}
     renderer.show_nodes({
         {
-            id = "neo_tree_submodules:loading",
+            id = "neo_tree_submodules|loading",
             name = "Loading...",
             type = "directory",
             children = {},
@@ -346,7 +356,7 @@ M.draw = function(state)
                 context.state = state
 
                 local root = file_items.create_item(context, submodule_path, "directory")
-                root.id = "neo_tree_submodules:root:" .. root.id
+                root.id = "neo_tree_submodules|root|" .. root.id
                 root.name = names[submodule_path]
                 root.loaded = true
                 root.search_pattern = state.search_pattern
@@ -380,7 +390,7 @@ M.draw = function(state)
             state.cached_submodule_nodes = nodes
             renderer.show_nodes({
                 {
-                    id = "neo_tree_submodules:header",
+                    id = "neo_tree_submodules|header",
                     type = "directory",
                     name = "REPOSITORIES under " .. git_root,
                     children = {},
