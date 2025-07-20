@@ -11,7 +11,7 @@ local M = {
     default_config = require("neo_tree_submodules.config"),
 }
 
-M.navigate = function(state, path, path_to_reveal, callback, async)
+M.navigate = function(state, path, path_to_reveal, callback)
     -- same rough logic as the standard git_status source, just swapping to our custom function
     state.path = path or state.path
     state.dirty = false

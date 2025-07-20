@@ -32,9 +32,8 @@ end
 
 ---Finds the root of the cwd's git repository
 ---@param callback fun(git_root: string|nil) Callback to run, passed the path to the git root, or nil on error
----@return Job job A started job
 M.get_repository_root = function(callback)
-    local job = Job:new({
+    Job:new({
         command = "git",
         args = { "rev-parse", "--show-toplevel" },
         enabled_recording = true,
@@ -58,9 +57,7 @@ M.get_repository_root = function(callback)
                 callback(git_root)
             end)
         end,
-    })
-    job:start()
-    return job
+    }):start()
 end
 
 ---@alias StatusPair {path: string, status: string}
@@ -73,7 +70,7 @@ M.parse_git_status_line = function(line, git_root)
     -- This logic is extracted from parse_git_status_line in neo-tree
     local line_parts = vim.split(line, "\t")
     if #line_parts < 2 then
-        return
+        return nil
     end
     local status = line_parts[1]
     local relative_path = line_parts[2]
@@ -323,8 +320,16 @@ M.draw = function(state)
     end
     state.loading = true
 
-    -- todo: cached repos
-    renderer.show_nodes({}, state)
+    state.default_expanded_nodes = state.default_expanded_nodes or {}
+    renderer.show_nodes({
+        {
+            id = "neo_tree_submodules:loading",
+            name = "Loading...",
+            type = "directory",
+            children = {},
+        },
+        unpack(state.cached_submodule_nodes or {})
+    }, state)
 
     M.get_repository_root(function(git_root)
         git_root = git_root or state.path or vim.fn.getcwd()
@@ -372,7 +377,17 @@ M.draw = function(state)
                 return vim.tbl_extend("keep", acc, v)
             end)
 
-            renderer.show_nodes(nodes, state)
+            state.cached_submodule_nodes = nodes
+            renderer.show_nodes({
+                {
+                    id = "neo_tree_submodules:header",
+                    type = "directory",
+                    name = "REPOSITORIES under " .. git_root,
+                    children = {},
+                },
+                unpack(nodes),
+            }, state)
+
             state.loading = false
         end)
     end)
