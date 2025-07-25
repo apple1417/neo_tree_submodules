@@ -360,7 +360,6 @@ M.draw = function(state)
                 root.name = names[submodule_path]
                 root.loaded = true
                 root.search_pattern = state.search_pattern
-                root.extra = { submodule = submodule_path }
 
                 context.folders[root.id] = root
                 table.insert(nodes, root)
@@ -375,8 +374,10 @@ M.draw = function(state)
                         }
                     end
                 end
-                for id, _ in pairs(context.folders) do
+
+                for id, node in pairs(context.folders) do
                     table.insert(state.default_expanded_nodes, id)
+                    node.extra = { submodule = submodule_path }
                 end
                 file_items.advanced_sort(root.children, state)
             end
