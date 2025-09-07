@@ -55,7 +55,8 @@ M.git_commit = function(state, and_push)
         size = width,
     }
 
-    inputs.input("Commit message: ", "", function(msg)
+    local msg = string.format("Commit message for %s: ", node.extra.submodule_name)
+    inputs.input(msg, "", function(msg)
     local cmd = { "git", "-C", node.extra.submodule, "commit", "-m", msg }
     local title = "git commit"
     local result = vim.fn.systemlist(cmd)
@@ -88,7 +89,11 @@ M.git_push = function(state)
         return
     end
 
-    inputs.confirm("Are you sure you want to push your changes?", function(yes)
+    local msg = string.format(
+        "Are you sure you want to push your changes to %s?",
+        node.extra.submodule_name
+    )
+    inputs.confirm(msg, function(yes)
         if yes then
             local result = vim.fn.systemlist({ "git", "-C", node.extra.submodule, "push" })
             events.fire_event(events.GIT_EVENT)
@@ -119,7 +124,12 @@ M.git_undo_last_commit = function(state)
         return
     end
 
-    inputs.confirm("Are you sure you want to undo the last commit? (keeps changes)", function(yes)
+
+    local msg = string.format(
+        "Are you sure you want to undo the last commit to %s? (keeps changes)",
+        node.extra.submodule_name
+    )
+    inputs.confirm(msg, function(yes)
         if yes then
             local cmd = { "git", "-C", node.extra.submodule, "reset", "--soft", "HEAD~1" }
             local result = vim.fn.systemlist(cmd)

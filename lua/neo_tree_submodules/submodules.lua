@@ -371,13 +371,17 @@ M.draw = function(state)
                         item.extra = {
                             git_status = status,
                             submodule = submodule_path,
+                            submodule_name = root.name,
                         }
                     end
                 end
 
                 for id, node in pairs(context.folders) do
                     table.insert(state.default_expanded_nodes, id)
-                    node.extra = { submodule = submodule_path }
+                    node.extra = {
+                        submodule = submodule_path,
+                        submodule_name = root.name,
+                    }
                 end
                 file_items.advanced_sort(root.children, state)
             end
