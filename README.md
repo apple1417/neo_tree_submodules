@@ -1,3 +1,22 @@
+# NOT MAINTAINED
+
+I'm not actively maintaining this plugin.
+
+Since [this neo-tree commit](https://github.com/nvim-neo-tree/neo-tree.nvim/commit/e4b35ec43d), this
+plugin no longer properly displays the git status - though it still works otherwise, it only lists
+modified files and add/remove/commit all still work. This is cause it pokes into neo-tree's
+internals a bit more than is guarenteed to be stable.
+
+If you want to use this plugin (and don't want to update it yourself), I recommend pinning neo-tree
+to a version just before this:
+```lua
+    {
+        "nvim-neo-tree/neo-tree.nvim",
+        commit = "a981ef287503c668434bffa78071d5b9ff92c12f",
+        ...
+    }
+```
+
 # Neo-tree submodules
 Git status viewer for [Neo-tree](https://github.com/nvim-neo-tree/neo-tree.nvim), which also shows
 changes in submodules. Inspired by VSCode.
